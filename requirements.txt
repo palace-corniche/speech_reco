@@ -1,5 +1,13 @@
-streamlit==1.31.1
-SpeechRecognition==3.10.1
-pydub==0.25.1
-portaudio19-dev
-ffmpeg
+streamlit
+SpeechRecognition
+```
+
+That's it. Just 2 lines, nothing else.
+
+**And delete `packages.txt`** - we don't need it for this simpler version.
+
+**Your folder should have:**
+```
+your-project/
+├── app.py
+└── requirements.txt
