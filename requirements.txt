@@ -1,6 +1,5 @@
 streamlit==1.31.1
 SpeechRecognition==3.10.1
 pydub==0.25.1
-**And your `packages.txt` should be:**
 portaudio19-dev
 ffmpeg
