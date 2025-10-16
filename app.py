@@ -1,9 +1,3 @@
-import subprocess
-import sys
-
-# Install required packages automatically
-subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "SpeechRecognition", "pyaudio", "pydub"])
-
 import streamlit as st
 import speech_recognition as sr
 from datetime import datetime
