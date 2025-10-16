@@ -3,7 +3,7 @@ SpeechRecognition==3.10.1
 pydub==0.25.1
 ```
 
-**`packages.txt`** - Add this (important for audio support):
+**And your `packages.txt` should be:**
 ```
 portaudio19-dev
 ffmpeg
