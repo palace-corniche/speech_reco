@@ -1,17 +1,9 @@
-streamlit==1.28.1
-SpeechRecognition==3.10.0
-pyaudio==0.2.13
+streamlit==1.31.1
+SpeechRecognition==3.10.1
 pydub==0.25.1
 ```
 
-**2. `packages.txt`** (for Streamlit Cloud)
+**`packages.txt`** - Add this (important for audio support):
 ```
 portaudio19-dev
-```
-
-**Your project structure:**
-```
-your-project/
-├── app.py
-├── requirements.txt
-└── packages.txt
+ffmpeg
