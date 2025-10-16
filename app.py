@@ -1,132 +1,272 @@
-import streamlit as st
-from datetime import datetime
+import React, { useState, useRef } from 'react';
+import { Mic, Square, Pause, Play, Trash2, Save, Copy } from 'lucide-react';
 
-# Set page configuration
-st.set_page_config(page_title="Speech Recognition App", layout="wide")
+export default function SpeechRecognitionApp() {
+  const [transcribedText, setTranscribedText] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState('en-US');
+  const [selectedAPI, setSelectedAPI] = useState('web');
+  const [status, setStatus] = useState('');
+  const recognitionRef = useRef(null);
 
-st.title("🎤 Speech Recognition App")
-st.write("Simple speech to text converter!")
+  const languages = {
+    'English': 'en-US',
+    'Spanish': 'es-ES',
+    'French': 'fr-FR',
+    'German': 'de-DE',
+    'Chinese': 'zh-CN',
+    'Japanese': 'ja-JP',
+    'Portuguese': 'pt-PT',
+  };
 
-# Initialize session state
-if "transcribed_text" not in st.session_state:
-    st.session_state.transcribed_text = ""
+  const startRecording = () => {
+    try {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        setStatus('❌ Speech Recognition not supported in your browser');
+        return;
+      }
 
-# Try to import speech recognition
-try:
-    import speech_recognition as sr
-    sr_available = True
-except ImportError:
-    sr_available = False
-    st.error("⚠️ Speech Recognition not available on this system")
+      const recognition = new SpeechRecognition();
+      recognition.language = selectedLanguage;
+      recognition.continuous = true;
+      recognition.interimResults = true;
 
-# Sidebar for settings
-with st.sidebar:
-    st.header("⚙️ Settings")
-    
-    # API Selection
-    st.subheader("1. Choose API")
-    api_choice = st.radio(
-        "Select API:",
-        ["Google Speech Recognition", "CMU Sphinx"],
-        help="Google needs internet, CMU Sphinx works offline"
-    )
-    
-    # Language Selection
-    st.subheader("2. Choose Language")
-    language_dict = {
-        "English": "en-US",
-        "Spanish": "es-ES",
-        "French": "fr-FR",
-        "German": "de-DE",
+      recognition.onstart = () => {
+        setIsRecording(true);
+        setStatus('🎤 Listening...');
+      };
+
+      recognition.onresult = (event) => {
+        let interimTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            setTranscribedText(prev => prev + ' ' + transcript);
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        if (interimTranscript) {
+          setStatus(`🎤 Listening... "${interimTranscript}"`);
+        }
+      };
+
+      recognition.onerror = (event) => {
+        setStatus(`❌ Error: ${event.error}`);
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+        setStatus('✅ Recording stopped');
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (error) {
+      setStatus(`❌ Error: ${error.message}`);
     }
-    selected_language = st.selectbox(
-        "Select language:",
-        list(language_dict.keys())
-    )
-    language_code = language_dict[selected_language]
+  };
 
-# Main content area
-col1, col2 = st.columns([2, 1])
+  const stopRecording = () => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+      setIsPaused(false);
+    }
+  };
 
-with col1:
-    st.subheader("3. Recording")
-    
-    if sr_available:
-        if st.button("🔴 Record Audio", use_container_width=True):
-            try:
-                recognizer = sr.Recognizer()
-                
-                with sr.Microphone() as source:
-                    st.info(f"🎤 Listening in {selected_language}...")
-                    recognizer.adjust_for_ambient_noise(source, duration=1)
-                    audio = recognizer.listen(source, timeout=10)
-                
-                st.info("Processing...")
-                
-                if api_choice == "Google Speech Recognition":
-                    try:
-                        text = recognizer.recognize_google(audio, language=language_code)
-                        st.session_state.transcribed_text += " " + text
-                        st.success("✅ Transcribed successfully!")
-                    except sr.UnknownValueError:
-                        st.error("❌ Could not understand. Speak clearly please.")
-                    except sr.RequestError as e:
-                        st.error(f"❌ Internet error: {str(e)}")
-                
-                else:  # CMU Sphinx
-                    try:
-                        text = recognizer.recognize_sphinx(audio)
-                        st.session_state.transcribed_text += " " + text
-                        st.success("✅ Transcribed successfully!")
-                    except sr.UnknownValueError:
-                        st.error("❌ Could not understand. Speak clearly please.")
-                    except Exception as e:
-                        st.error(f"❌ Error: {str(e)}")
-            
-            except Exception as e:
-                st.error(f"❌ Microphone error: {str(e)}")
-    else:
-        st.warning("Speech Recognition not available. Install: pip install SpeechRecognition")
-    
-    st.subheader("4. Your Text")
-    text_area = st.text_area(
-        "Transcribed text:",
-        value=st.session_state.transcribed_text,
-        height=200
-    )
-    st.session_state.transcribed_text = text_area
+  const pauseRecording = () => {
+    if (recognitionRef.current) {
+      if (isPaused) {
+        recognitionRef.current.abort();
+        startRecording();
+        setIsPaused(false);
+      } else {
+        recognitionRef.current.abort();
+        setIsPaused(true);
+        setStatus('⏸️ Paused');
+      }
+    }
+  };
 
-with col2:
-    st.subheader("Actions")
-    
-    if st.button("🗑️ Clear", use_container_width=True):
-        st.session_state.transcribed_text = ""
-        st.rerun()
-    
-    if st.button("📋 Copy", use_container_width=True):
-        st.info("Ready to paste!")
-    
-    st.subheader("Save")
-    if st.button("💾 Save File", use_container_width=True):
-        if st.session_state.transcribed_text.strip():
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"transcription_{timestamp}.txt"
-            
-            try:
-                with open(filename, "w") as f:
-                    f.write(st.session_state.transcribed_text)
-                st.success(f"✅ Saved: {filename}")
-            except Exception as e:
-                st.error(f"❌ Save error: {str(e)}")
-        else:
-            st.warning("No text to save")
+  const clearText = () => {
+    setTranscribedText('');
+    setStatus('');
+  };
 
-st.markdown("---")
-st.markdown("""
-### How to use:
-1. Choose API and language
-2. Click "Record Audio"
-3. Speak clearly (10 seconds max)
-4. Text will appear below
-5. Save or clear as needed
-""")
+  const saveToFile = () => {
+    if (!transcribedText.trim()) {
+      setStatus('⚠️ No text to save');
+      return;
+    }
+
+    const element = document.createElement('a');
+    const file = new Blob([transcribedText], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    element.download = `transcription_${timestamp}.txt`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+    setStatus('✅ File saved!');
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(transcribedText);
+    setStatus('📋 Copied to clipboard!');
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-8">
+      <div className="max-w-6xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-800 mb-2">🎤 Speech Recognition App</h1>
+          <p className="text-gray-600">Convert your speech to text using browser's built-in Web Speech API</p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Sidebar Settings */}
+          <div className="lg:col-span-1 bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-bold text-gray-800 mb-6">⚙️ Settings</h2>
+
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">API Type</label>
+              <select
+                value={selectedAPI}
+                onChange={(e) => setSelectedAPI(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="web">Web Speech API</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-2">✅ Works offline (no installation needed)</p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Language</label>
+              <select
+                value={selectedLanguage}
+                onChange={(e) => setSelectedLanguage(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {Object.entries(languages).map(([name, code]) => (
+                  <option key={code} value={code}>{name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="lg:col-span-3 space-y-6">
+            {/* Recording Section */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">Recording Controls</h2>
+              
+              <div className="flex flex-wrap gap-3 mb-4">
+                <button
+                  onClick={startRecording}
+                  disabled={isRecording}
+                  className="flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                >
+                  <Mic size={20} /> Start Recording
+                </button>
+
+                <button
+                  onClick={pauseRecording}
+                  disabled={!isRecording}
+                  className="flex items-center gap-2 px-6 py-3 bg-yellow-500 text-white rounded-lg font-semibold hover:bg-yellow-600 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                >
+                  {isPaused ? <Play size={20} /> : <Pause size={20} />}
+                  {isPaused ? 'Resume' : 'Pause'}
+                </button>
+
+                <button
+                  onClick={stopRecording}
+                  disabled={!isRecording}
+                  className="flex items-center gap-2 px-6 py-3 bg-gray-700 text-white rounded-lg font-semibold hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition"
+                >
+                  <Square size={20} /> Stop
+                </button>
+              </div>
+
+              {/* Status Display */}
+              {status && (
+                <div className={`p-3 rounded-lg font-semibold ${
+                  status.includes('❌') ? 'bg-red-100 text-red-800' :
+                  status.includes('✅') ? 'bg-green-100 text-green-800' :
+                  'bg-blue-100 text-blue-800'
+                }`}>
+                  {status}
+                </div>
+              )}
+
+              {isRecording && (
+                <div className="mt-3 p-3 bg-blue-100 text-blue-800 rounded-lg font-semibold">
+                  🔴 Recording is ACTIVE - Please speak now...
+                </div>
+              )}
+
+              {isPaused && (
+                <div className="mt-3 p-3 bg-yellow-100 text-yellow-800 rounded-lg font-semibold">
+                  ⏸️ Recording is PAUSED
+                </div>
+              )}
+            </div>
+
+            {/* Text Display */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">Transcribed Text</h2>
+              <textarea
+                value={transcribedText}
+                onChange={(e) => setTranscribedText(e.target.value)}
+                placeholder="Your transcribed text will appear here..."
+                className="w-full h-48 p-4 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              />
+            </div>
+
+            {/* Actions */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-4">Actions</h2>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={copyToClipboard}
+                  className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition"
+                >
+                  <Copy size={20} /> Copy
+                </button>
+
+                <button
+                  onClick={saveToFile}
+                  className="flex items-center gap-2 px-6 py-3 bg-green-500 text-white rounded-lg font-semibold hover:bg-green-600 transition"
+                >
+                  <Save size={20} /> Save File
+                </button>
+
+                <button
+                  onClick={clearText}
+                  className="flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition"
+                >
+                  <Trash2 size={20} /> Clear
+                </button>
+              </div>
+            </div>
+
+            {/* Instructions */}
+            <div className="bg-indigo-50 rounded-lg shadow-lg p-6 border-l-4 border-indigo-500">
+              <h3 className="text-lg font-bold text-indigo-900 mb-3">📋 How to use:</h3>
+              <ul className="space-y-2 text-indigo-800">
+                <li>✅ Choose your language from settings</li>
+                <li>✅ Click "Start Recording" and speak clearly</li>
+                <li>✅ Use Pause/Resume if needed</li>
+                <li>✅ Click "Stop" when done</li>
+                <li>✅ Copy text or save to a file</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
